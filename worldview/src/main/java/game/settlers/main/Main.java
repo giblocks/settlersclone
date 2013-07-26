@@ -17,6 +17,7 @@ public class Main {
 	public static void main(String[] args) {
 		Frame frame = new Frame("Settlers");
 		GLCanvas canvas = new GLCanvas();
+		canvas.setFocusable(false);
 
 		final SimpleKeyListener keyListener = new SimpleKeyListener();
 		frame.addKeyListener(keyListener);

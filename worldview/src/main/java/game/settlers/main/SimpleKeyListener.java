@@ -15,6 +15,8 @@ public class SimpleKeyListener implements KeyListener {
 	public static final int ROT_RIGHT = 32;
 	public static final int ROT_UP = 64;
 	public static final int ROT_DOWN = 128;
+	public static final int VIEW_CHANGE = 256;
+	public static final int RESET = 512;
 	
 	private int keysPressed;
 
@@ -28,6 +30,8 @@ public class SimpleKeyListener implements KeyListener {
 		keyMap.put('e', ROT_RIGHT);
 		keyMap.put('r', ROT_UP);
 		keyMap.put('f', ROT_DOWN);
+		keyMap.put('t', VIEW_CHANGE);
+		keyMap.put('1', RESET);
 	}
 
 	public SimpleKeyListener() {

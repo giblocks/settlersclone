@@ -20,7 +20,7 @@ public class MatrixHelper {
 	public static float[] perspective(float fovy, float aspect, float zNear,
 			float zFar) {
 		float radians = (float) Math.toRadians(fovy / 2);
-		float deltaZ = zFar - zNear;
+		float deltaZ = zNear - zFar;
 		float sine = (float) Math.sin(radians);
 		if ((deltaZ == 0) || (sine == 0) || (aspect == 0)) {
 			return identity();
@@ -29,9 +29,9 @@ public class MatrixHelper {
 		float m[] = identity();
 		m[0 * 4 + 0] = cotangent / aspect;
 		m[1 * 4 + 1] = cotangent;
-		m[2 * 4 + 2] = -(zFar + zNear) / deltaZ;
+		m[2 * 4 + 2] = (zFar + zNear) / deltaZ;
 		m[2 * 4 + 3] = -1;
-		m[3 * 4 + 2] = -2 * zNear * zFar / deltaZ;
+		m[3 * 4 + 2] = 2 * zNear * zFar / deltaZ;
 		m[3 * 4 + 3] = 0;
 		return m;
 	}
@@ -317,6 +317,7 @@ public class MatrixHelper {
 			}
 			System.out.println();
 		}
+		System.out.println();
 	}
 
 	/**
@@ -366,7 +367,6 @@ public class MatrixHelper {
 	    float[] cv = new float[] {center[0], center[1], center[2]};
 	    float[] uv = new float[] {up[0], up[1], up[2]};
 
-//	    float[] n = normalize(plus(ev, negative(cv)));
 	    float[] n = normalize(minus(ev, cv));
 	    float[] u = normalize(cross(uv, n));
 	    float[] v = cross(n, u);
@@ -387,6 +387,17 @@ public class MatrixHelper {
 		for(int i = 0; i < a.length; i++) {
 			result[i] = -a[i];
 		}
+		return result;
+	}
+
+	public static float[] ortho(float w, float h, float n, float f) {
+		float[] result = new float[] {
+				1.0f / w, 0.0f, 0.0f, 0.0f,
+				0.0f, 1.0f / h, 0.0f, 0.0f,
+				0.0f, 0.0f, 1.0f / (n - f), 0.0f,
+				0.0f, 0.0f, 0.0f, 1.0f
+		};
+		
 		return result;
 	}
 }

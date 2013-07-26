@@ -50,7 +50,8 @@ public class ViewNode implements ModelNodeListener {
 
 	public ViewNode(WorldModel worldModel, int x, int z) {
 		this.worldModel = worldModel;
-		vertex = new float[] {x / 2f + (float)(z & 1) * 0.25f, worldModel.getGroundNodes()[x][z].getHeight() / 10f, -z / 2f};
+//		vertex = new float[] {x / 2f + (float)(z & 1) * 0.25f, worldModel.getGroundNodes()[x][z].getHeight() / 10f, -z / 2f};
+		vertex = new float[] {x / 2f - z * 0.25f, worldModel.getGroundNodes()[x][z].getHeight() / 10f, -z / 2f};
 		color = new float[] {0.2f, 0.7f, 0.1f};
 	}
 
