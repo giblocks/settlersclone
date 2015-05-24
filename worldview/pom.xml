@@ -9,6 +9,11 @@
   		<artifactId>worldmodel</artifactId>
   		<version>0.0.1-SNAPSHOT</version>
   	</dependency>
+  	<dependency>
+  		<groupId>game.settlers</groupId>
+  		<artifactId>util</artifactId>
+  		<version>0.0.1-SNAPSHOT</version>
+  	</dependency>
 
 	<dependency>
 		<groupId>org.jogamp.gluegen</groupId>

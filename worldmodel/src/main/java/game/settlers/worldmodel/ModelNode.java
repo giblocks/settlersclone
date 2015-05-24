@@ -5,14 +5,14 @@ import java.util.Set;
 
 public class ModelNode {
 
-	private int height;
+	private float height;
 	private Set<ModelNodeListener> listeners = new HashSet<ModelNodeListener>();
 
-	public ModelNode(int height) {
+	public ModelNode(float height) {
 		this.height = height;
 	}
 
-	public int getHeight() {
+	public float getHeight() {
 		return height;
 	}
 	

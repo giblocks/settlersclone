@@ -25,6 +25,8 @@ public class Camera {
 	
 	private int lastKeysPressed;
 	
+	private float zoom = 10f;
+	
 	public Camera(SimpleKeyListener keyListener) {
 		this.keyListener = keyListener;
 		updateProjectionMatrix();
@@ -107,18 +109,38 @@ public class Camera {
 		}
 		rx = rx < 1f ? 1f : rx > 90f ? 90f : rx;
 		
+		if((keysPressed & SimpleKeyListener.ZOOM_IN) > 0) {
+			zoom -= 1.0f * moveMultiplier;
+		}
+		if((keysPressed & SimpleKeyListener.ZOOM_OUT) > 0) {
+			zoom += 1.0f * moveMultiplier;
+		}
+		zoom = zoom < 1f ? 1f : zoom > 90f ? 90f : zoom;
+		
 //		System.out.println("x: " + x + "\ty: " + y + "\tz: " + z + "\trx: " + rx + "\try: " + ry);
 
 		if (keysPressed > 0) {
 			updateViewMatrix((keysPressed & SimpleKeyListener.VIEW_CHANGE) > 0);
 		}
 
-		if((lastKeysPressed & SimpleKeyListener.VIEW_CHANGE) == 0 && (keysPressed & SimpleKeyListener.VIEW_CHANGE) > 0) {
+		boolean needUpdateProjectionMatrix = false;
+
+		if( (lastKeysPressed & SimpleKeyListener.VIEW_CHANGE) == 0 && (keysPressed & SimpleKeyListener.VIEW_CHANGE) > 0 ) {
 			if (projectionMode == ProjectionMode.ORTHOGONAL) {
 				projectionMode = ProjectionMode.PERSPECTIVE;
 			} else {
 				projectionMode = ProjectionMode.ORTHOGONAL;
 			}
+			
+			needUpdateProjectionMatrix = true;
+		}
+		
+		if ((keysPressed & (SimpleKeyListener.ROT_DOWN | SimpleKeyListener.ROT_UP)) > 0 && projectionMode == ProjectionMode.ORTHOGONAL) {
+			needUpdateProjectionMatrix = true;
+		}
+
+
+		if(needUpdateProjectionMatrix) {
 			updateProjectionMatrix();
 		}
 		
@@ -129,19 +151,23 @@ public class Camera {
 		float[] center = new float[] {x, y, z};
 		
 		float[] eyeDirection = new float[] {0.0f, 0.0f, 1.0f, 1.0f};
+		eyeDirection = MatrixHelper.multiplyVector(MatrixHelper.rotationX(rx), eyeDirection);
 		eyeDirection = MatrixHelper.multiplyVector(MatrixHelper.rotationY(ry), eyeDirection);
-		float[] eye = MatrixHelper.plus(center, MatrixHelper.scalarMultiply(eyeDirection, rx));
-		float[] up;
+		float[] eye = MatrixHelper.plus(center, MatrixHelper.scalarMultiply(eyeDirection, zoom));
+		float[] up = new float[] {0.0f, 1.0f, 0.0f};
 		
 		if(topDown) {
 //			System.out.println("top down");
 			eye = new float[] {center[0], center[1] + rx, center[2]};
 			up = MatrixHelper.multiplyVector(MatrixHelper.rotationY(ry), new float[] {0.0f, 0.0f, -1.0f, 1.0f});
-		} else {
+		}
+/*		
+		else {
 			eye[1] = rx * rx / 10f;
 			up = new float[] {0.0f, 1.0f, 0.0f};
 		}
 		System.out.println(String.format("c: %f,  %f, %f         e: %f, %f, %f", center[0], center[1], center[2], eye[0], eye[1], eye[2]));
+ */
 		
 		viewMatrix = MatrixHelper.lookAt(eye, center, up);
 /*
@@ -154,7 +180,7 @@ public class Camera {
 		
 	}
 
-	
+/*	
 	private void updateModelViewMatrixOrtho(boolean topDown) {
 		float[] center = new float[] {x, y, z};
 		
@@ -174,7 +200,7 @@ public class Camera {
 //		viewMatrix = rotationMatrix;
 	}
 
-	public void reshape(int width, int height) {
+*/	public void reshape(int width, int height) {
 		screenWidth = width;
 		screenHeight = height;
 	}
@@ -184,7 +210,7 @@ public class Camera {
 
 		switch (projectionMode) {
 		case ORTHOGONAL:
-			projectionMatrix = MatrixHelper.ortho(10.0f * aspect, 10.0f, 0.1f, 100.0f);
+			projectionMatrix = MatrixHelper.ortho(zoom * aspect, zoom, 0.1f, 100.0f);
 			break;
 		case PERSPECTIVE:
 			projectionMatrix = MatrixHelper.perspective(50, aspect, 0.1f, 100.0f);

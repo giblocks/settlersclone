@@ -2,6 +2,7 @@ package game.settlers.main;
 
 import game.settlers.worldmodel.WorldModel;
 import game.settlers.worldmodel.generators.BasicWorldGenerator;
+import game.settlers.worldmodel.generators.SimplePerlinWorldGenerator;
 import game.settlers.worldview.SimpleWorldViewOGL4;
 
 import java.awt.Frame;
@@ -22,7 +23,7 @@ public class Main {
 		final SimpleKeyListener keyListener = new SimpleKeyListener();
 		frame.addKeyListener(keyListener);
 		
-		final WorldModel worldModel = new WorldModel(50, new BasicWorldGenerator(12345));
+		final WorldModel worldModel = new WorldModel(200, new SimplePerlinWorldGenerator(12345));
 		final SimpleWorldViewOGL4 worldView = new SimpleWorldViewOGL4(worldModel, keyListener);
 
 		

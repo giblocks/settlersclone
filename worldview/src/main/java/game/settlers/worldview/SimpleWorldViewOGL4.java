@@ -18,6 +18,8 @@ import org.apache.commons.math.geometry.Vector3D;
 import com.jogamp.common.nio.Buffers;
 
 public class SimpleWorldViewOGL4 implements GLEventListener {
+	
+
 	private final WorldModel worldModel;
 	private int traingleProgram;
 	
@@ -28,15 +30,14 @@ public class SimpleWorldViewOGL4 implements GLEventListener {
 	private int indexBufferObject;
 
 	
-	private int numIndexes;
-
 	private IntBuffer buffers;
 	
-	private int numVertices;
 	private int pointProgram;
 	
 	
 	private final Camera camera;
+	private ShadingType shadingType = ShadingType.FLAT;
+	private int numIndices;
 
 	
 	public SimpleWorldViewOGL4(WorldModel worldModel, SimpleKeyListener keyListener) {
@@ -49,29 +50,29 @@ public class SimpleWorldViewOGL4 implements GLEventListener {
 		ModelNode[][] groundNodes = worldModel.getGroundNodes();
 		viewNodes = new ViewNode[groundNodes.length][groundNodes[0].length];
 		for(int x = 0; x < groundNodes.length; x++) {
-			for(int y = 0; y < groundNodes[0].length; y++) {
-				viewNodes[x][y] = new ViewNode(worldModel, x, y);
+			for(int z = 0; z < groundNodes[0].length; z++) {
+				viewNodes[x][z] = new ViewNode(worldModel, x, z);
 			}
 		}
 		for(int x = 0; x < groundNodes.length; x++) {
-			for(int y = 0; y < groundNodes[0].length; y++) {
-				int xl = x - 1 < 0 ? groundNodes[0].length - 1 : x - 1;
-				int yu = y - 1 < 0 ? groundNodes.length - 1 : y - 1;
-				int xr = x + 1 == groundNodes[0].length ? 0 : x + 1;
-				int yd = y + 1 == groundNodes.length ? 0 : y + 1;
-				viewNodes[x][y].setSurroundingNodes(new ViewNode[] {
-						viewNodes[xr][y],
-						viewNodes[xr][yd],
-						viewNodes[x][yd],
-						viewNodes[xl][y],
-						viewNodes[xl][yu],
-						viewNodes[x][yu]
+			for(int z = 0; z < groundNodes[0].length; z++) {
+				int xm1 = x - 1 < 0 ? groundNodes[0].length - 1 : x - 1;
+				int zm1 = z - 1 < 0 ? groundNodes.length - 1 : z - 1;
+				int xp1 = x + 1 == groundNodes[0].length ? 0 : x + 1;
+				int zp1 = z + 1 == groundNodes.length ? 0 : z + 1;
+				viewNodes[x][z].setSurroundingNodes(new ViewNode[] {
+						viewNodes[xp1][z],
+						viewNodes[xp1][zp1],
+						viewNodes[x][zp1],
+						viewNodes[xm1][z],
+						viewNodes[xm1][zm1],
+						viewNodes[x][zm1]
 				});
 			}
 		}
 		for(int x = 0; x < groundNodes.length; x++) {
-			for(int y = 0; y < groundNodes[0].length; y++) {
-				viewNodes[x][y].calculateNormal();
+			for(int z = 0; z < groundNodes[0].length; z++) {
+				viewNodes[x][z].calculateNormals();
 			}
 		}
 	}
@@ -81,6 +82,7 @@ public class SimpleWorldViewOGL4 implements GLEventListener {
 		System.out.println("GL Version: " + gl.glGetString(GL3.GL_VERSION));
 		gl.setSwapInterval(1);
 		gl.glEnable(GL3.GL_DEPTH_TEST);
+		gl.glEnable(GL3.GL_CULL_FACE);
 
 		createProgram(gl);
 		createData(gl);
@@ -105,6 +107,18 @@ public class SimpleWorldViewOGL4 implements GLEventListener {
 		gl.glLinkProgram(pointProgram);
 	}
 
+	private class DataMap {
+		private final FloatBuffer vertices;
+		private final FloatBuffer normals;
+		private final IntBuffer indices;
+
+		private DataMap(FloatBuffer vertices, FloatBuffer normals, IntBuffer indices) {
+			super();
+			this.vertices = vertices;
+			this.normals = normals;
+			this.indices = indices;
+		};
+	}
 	
 	private void createData(GL3 gl) {
 		buffers = Buffers.newDirectIntBuffer(3);
@@ -113,103 +127,118 @@ public class SimpleWorldViewOGL4 implements GLEventListener {
 		normalBufferObject = buffers.get();
 		indexBufferObject = buffers.get();
 		buffers.rewind();
-
-		/*		
-		int numTriangles = (viewNodes.length - 1) * (viewNodes[0].length - 1) * 2;
-		int numVertices = numTriangles * 3;
-		 */		
-		int numTriangles = (viewNodes.length - 1) * (viewNodes[0].length - 1) * 2;
-		numVertices = viewNodes.length * viewNodes[0].length;
-
-		FloatBuffer vertices = Buffers.newDirectFloatBuffer(numVertices * 3);
-		FloatBuffer normals = Buffers.newDirectFloatBuffer(numVertices * 3);
-		IntBuffer indices = Buffers.newDirectIntBuffer(numTriangles * 3);
-
-//		getSharpData(vertices, normals);
-
-		getSmoothData(vertices, normals, indices);
 		
+		fillBufferObjects(gl);
+	}
+	
+	public void changeShadingType(GL3 gl, ShadingType shadingType) {
+		this.shadingType = shadingType;
+		fillBufferObjects(gl);
+	}
+	
+	private void fillBufferObjects(GL3 gl) {
+		DataMap dataMap;
+		if(shadingType  == ShadingType.FLAT) {
+			dataMap = createFlatData(gl);
+		} else {
+			dataMap = createSmoothData(gl);
+		}
+		
+		gl.glBindBuffer(GL3.GL_ARRAY_BUFFER, vertexBufferObject);
+		gl.glBufferData(GL3.GL_ARRAY_BUFFER, dataMap.vertices.capacity() * Buffers.SIZEOF_FLOAT, dataMap.vertices, GL3.GL_STATIC_DRAW);
+
+		gl.glBindBuffer(GL3.GL_ARRAY_BUFFER, normalBufferObject);
+		gl.glBufferData(GL3.GL_ARRAY_BUFFER, dataMap.normals.capacity() * Buffers.SIZEOF_FLOAT, dataMap.normals, GL3.GL_STATIC_DRAW);
+
+		gl.glBindBuffer(GL3.GL_ELEMENT_ARRAY_BUFFER, indexBufferObject);
+		gl.glBufferData(GL3.GL_ELEMENT_ARRAY_BUFFER, dataMap.indices.capacity() * Buffers.SIZEOF_INT, dataMap.indices, GL3.GL_STATIC_DRAW);
+
+		gl.glBindBuffer(GL3.GL_ARRAY_BUFFER, 0);
+		gl.glBindBuffer(GL3.GL_ELEMENT_ARRAY_BUFFER, 0);
+	}
+	
+	private DataMap createFlatData(GL3 gl) {
+		int numVertices = (viewNodes.length - 1) * (viewNodes.length - 1) * 18;
+		int numNormals = (viewNodes.length - 1) * (viewNodes.length - 1) * 18;
+		numIndices = (viewNodes.length - 1) * (viewNodes.length - 1) * 6;
+		
+		FloatBuffer vertices = Buffers.newDirectFloatBuffer(numVertices);
+		FloatBuffer normals = Buffers.newDirectFloatBuffer(numNormals);
+		IntBuffer indices = Buffers.newDirectIntBuffer(numIndices);
+		DataMap dataMap = new DataMap(vertices, normals, indices);
+		
+		for(int x = 0; x < viewNodes.length - 1; x++) {
+			for(int z = 0; z < viewNodes.length - 1; z++) {
+				vertices.put(viewNodes[x][z].getVertex());
+				vertices.put(viewNodes[x+1][z+1].getVertex());
+				vertices.put(viewNodes[x][z+1].getVertex());
+
+				vertices.put(viewNodes[x][z].getVertex());
+				vertices.put(viewNodes[x+1][z].getVertex());
+				vertices.put(viewNodes[x+1][z+1].getVertex());
+				
+				float[][] faceNormals = viewNodes[x][z].getNormalsData(ShadingType.FLAT);
+//				System.out.println("x: " + x + ", z: " + z + ", normal0: " + faceNormals[0][0] + ", " + faceNormals[0][0] + ", " + faceNormals[0][0]);
+//				System.out.println("x: " + x + ", z: " + z + ", normal1: " + faceNormals[1][0] + ", " + faceNormals[1][0] + ", " + faceNormals[1][0]);
+				normals.put(faceNormals[0]);
+				normals.put(faceNormals[0]);
+				normals.put(faceNormals[0]);
+
+				normals.put(faceNormals[1]);
+				normals.put(faceNormals[1]);
+				normals.put(faceNormals[1]);
+				
+				indices.put(6 * (x * (viewNodes.length - 1) + z) + 0);
+				indices.put(6 * (x * (viewNodes.length - 1) + z) + 1);
+				indices.put(6 * (x * (viewNodes.length - 1) + z) + 2);
+
+				indices.put(6 * (x * (viewNodes.length - 1) + z) + 3);
+				indices.put(6 * (x * (viewNodes.length - 1) + z) + 4);
+				indices.put(6 * (x * (viewNodes.length - 1) + z) + 5);
+			}
+		}
+
+		vertices.rewind();
+		normals.rewind();
+		indices.rewind();
+
+		return dataMap;
+	}
+
+	private DataMap createSmoothData(GL3 gl) {
+		int numVertices = viewNodes.length * viewNodes.length * 3;
+		int numNormals = viewNodes.length * viewNodes.length * 3;
+		numIndices = viewNodes.length * viewNodes.length * 6;
+		
+		FloatBuffer vertices = Buffers.newDirectFloatBuffer(numVertices);
+		FloatBuffer normals = Buffers.newDirectFloatBuffer(numNormals);
+		IntBuffer indices = Buffers.newDirectIntBuffer(numIndices);
+		DataMap dataMap = new DataMap(vertices, normals, indices);
+		
+		for(int x = 0; x < viewNodes.length; x++) {
+			for(int z = 0; z < viewNodes.length; z++) {
+				vertices.put(viewNodes[x][z].getVertex());
+				normals.put(viewNodes[x][z].getNormalsData(ShadingType.SMOOTH)[0]);
+				
+				if(x < viewNodes.length - 1 && z < viewNodes[0].length - 1) {
+					indices.put(x * viewNodes.length + z);
+					indices.put((x + 1) * viewNodes.length + z);
+					indices.put((x + 1) * viewNodes.length + z + 1);
+
+					indices.put(x * viewNodes.length + z);
+					indices.put((x + 1) * viewNodes.length + z + 1);
+					indices.put(x * viewNodes.length + z + 1);
+				}
+			}
+		}
 		
 		vertices.rewind();
 		normals.rewind();
 		indices.rewind();
 		
-		/*
-		int i;
-		i = 0;
-		while(true) {
-			try {
-				System.out.println(i++ + ": " + vertices.get() + ", " + vertices.get() + ", " + vertices.get());
-			} catch (Exception e) {
-				vertices.rewind();
-				break;
-			}
-		}
-		i = 0;
-		while(true) {
-			try {
-				System.out.println(i++ + ": " + normals.get() + ", " + normals.get() + ", " + normals.get());
-			} catch (Exception e) {
-				normals.rewind();
-				break;
-			}
-		}
-		i = 0;
-		while(true) {
-			try {
-				System.out.println(i++ + ": " + indices.get() + ", " + indices.get() + ", " + indices.get());
-			} catch (Exception e) {
-				indices.rewind();
-				break;
-			}
-		}
-*/		
-		numIndexes = indices.capacity();
-		
-		gl.glBindBuffer(GL3.GL_ARRAY_BUFFER, vertexBufferObject);
-		gl.glBufferData(GL3.GL_ARRAY_BUFFER, vertices.capacity() * Buffers.SIZEOF_FLOAT, vertices, GL3.GL_STATIC_DRAW);
-
-		gl.glBindBuffer(GL3.GL_ARRAY_BUFFER, normalBufferObject);
-		gl.glBufferData(GL3.GL_ARRAY_BUFFER, normals.capacity() * Buffers.SIZEOF_FLOAT, normals, GL3.GL_STATIC_DRAW);
-
-		gl.glBindBuffer(GL3.GL_ELEMENT_ARRAY_BUFFER, indexBufferObject);
-		gl.glBufferData(GL3.GL_ELEMENT_ARRAY_BUFFER, indices.capacity() * Buffers.SIZEOF_INT, indices, GL3.GL_STATIC_DRAW);
-
-		gl.glBindBuffer(GL3.GL_ARRAY_BUFFER, 0);
-		gl.glBindBuffer(GL3.GL_ELEMENT_ARRAY_BUFFER, 0);
+		return dataMap;
 	}
-
-	private void getSmoothData(FloatBuffer vertices, FloatBuffer normals,
-			IntBuffer indices) {
-		for(int x = 0; x < viewNodes.length; x++) {
-			for(int y = 0; y < viewNodes.length; y++) {
-				vertices.put(viewNodes[x][y].getVertex());
-
-				normals.put(viewNodes[x][y].getNormal());
-				
-				if(x < viewNodes.length - 1 && y < viewNodes[0].length - 1) {
-					indices.put(x * viewNodes.length + y);
-					indices.put((x + 1) * viewNodes.length + y);
-					indices.put((x + 1) * viewNodes.length + (y + 1));
-					
-					indices.put(x * viewNodes.length + y);
-					indices.put((x + 1) * viewNodes.length + (y + 1));
-					indices.put(x * viewNodes.length + (y + 1));
-				}
-			}
-		}
-	}
-
-	private void getSharpData(FloatBuffer vertices, FloatBuffer normals) {
-		for(int x = 0; x < viewNodes.length - 1; x++) {
-			for(int y = 0; y < viewNodes.length - 1; y++) {
-				vertices.put(viewNodes[x][y].getTrainglesVertexData());
-
-				normals.put(viewNodes[x][y].getTrainglesNormalData());
-			}
-		}
-	}
-
+	
 	public void display(GLAutoDrawable drawable) {
 		camera.update();
 		
@@ -251,12 +280,9 @@ public class SimpleWorldViewOGL4 implements GLEventListener {
 		gl.glVertexAttribPointer(normalLocation, 3, GL3.GL_FLOAT, false, 0, 0);
 		
 		gl.glBindBuffer(GL3.GL_ELEMENT_ARRAY_BUFFER, indexBufferObject);
-		gl.glDrawElements(GL3.GL_TRIANGLES, numIndexes, GL3.GL_UNSIGNED_INT, 0);
-		/*		
-		gl.glDrawArrays(GL3.GL_TRIANGLES, 0, numIndexes);
-		 */
+		gl.glDrawElements(GL3.GL_TRIANGLES, numIndices, GL3.GL_UNSIGNED_INT, 0);
 
-		gl.glDisableVertexAttribArray(vertexLocation);
+//		gl.glDisableVertexAttribArray(vertexLocation);
 //		gl.glDisableVertexAttribArray(normalLocation);
 
 
@@ -281,7 +307,8 @@ public class SimpleWorldViewOGL4 implements GLEventListener {
 			gl.glUniform1i(usePointSizeLocation, 0);
 		}
 //		gl.glDisable(GL3.GL_DEPTH_TEST);
-		gl.glDrawArrays(GL3.GL_POINTS, 0, numVertices);
+		gl.glDrawElements(GL3.GL_TRIANGLES, numIndices, GL3.GL_UNSIGNED_INT, 0);
+//		gl.glDrawArrays(GL3.GL_POINTS, 0, numVertices);
 
 		
 		

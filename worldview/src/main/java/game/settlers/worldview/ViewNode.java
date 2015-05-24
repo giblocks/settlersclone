@@ -1,5 +1,7 @@
 package game.settlers.worldview;
 
+import java.util.EnumMap;
+
 import game.settlers.helpers.MatrixHelper;
 import game.settlers.worldmodel.ModelNode;
 import game.settlers.worldmodel.ModelNodeListener;
@@ -10,30 +12,12 @@ public class ViewNode implements ModelNodeListener {
 	private ViewNode[] surroundingNodes;
 	
 	private float[] vertex;
-	private float[] normal;
+	private EnumMap<ShadingType, float[][]> normals = new EnumMap<ShadingType, float[][]>(ShadingType.class);
+	
 	private float[] color;
-/*	
-	private static final Vector3D rEdge, drEdge, dlEdge;
-	static {
-		float[] rEdgeFloat = new float[] {1.0f, 0.0f, 0.0f, 1.0f};
-		rEdge = new Vector3D(rEdgeFloat[0], rEdgeFloat[1], rEdgeFloat[2]);
-
-		float[] rotationMatrix = MatrixHelper.rotationY(60);
-		float[] drEdgeFloat = MatrixHelper.multiplyVector(rotationMatrix, rEdgeFloat);
-		drEdge = new Vector3D(drEdgeFloat[0], drEdgeFloat[1], drEdgeFloat[2]);
-		
-		rotationMatrix = MatrixHelper.rotationY(120);
-		float[] dlEdgeFloat = MatrixHelper.multiplyVector(rotationMatrix, rEdgeFloat);
-		dlEdge = new Vector3D(dlEdgeFloat[0], dlEdgeFloat[1], dlEdgeFloat[2]);
-	}
-*/	
 	
 	public float[] getVertex() {
 		return vertex;
-	}
-
-	public float[] getNormal() {
-		return normal;
 	}
 
 	public float[] getColor() {
@@ -59,20 +43,21 @@ public class ViewNode implements ModelNodeListener {
 		setVerxexY(node.getHeight());
 	}
 	
-	private void setVerxexY(int height) {
+	private void setVerxexY(float height) {
 		setVertexY(height, true);
 	}
 
-	private void setVertexY(int height, boolean recalculateNormal) {
+	private void setVertexY(float height, boolean recalculateNormal) {
 		vertex[1] = (float)height / 10f;
 		if (recalculateNormal) {
-			calculateNormal();
+			calculateNormals();
 		}
 	}
 	
-	protected void calculateNormal() {
+	public void calculateNormals() {
 		float[][] faceNormals = getFaceNormals();
-		normal = averageNormals(faceNormals);
+		normals.put(ShadingType.SMOOTH, new float[][] {averageNormals(faceNormals)});
+		normals.put(ShadingType.FLAT, new float[][] {faceNormals[0], faceNormals[1]});
 	}
 
 	private float[][] getFaceNormals() {
@@ -80,18 +65,24 @@ public class ViewNode implements ModelNodeListener {
 		float[] thisCentered = new float[] {0.0f, vertex[1], 0.0f};
 		for (int i = 0; i < surroundingNodes.length; i++) {
 			int i2 = i < 5 ? i + 1 : i - 5;
-			ViewNode aNode = surroundingNodes[i];
-			ViewNode bNode = surroundingNodes[i2];
-			
+			float[] aNode = surroundingNodes[i].vertex;
+			float[] bNode = surroundingNodes[i2].vertex;
+
 			float[] aFloat = MatrixHelper.multiplyVector(MatrixHelper.rotationY(60 * i), new float[] {1.0f, 0.0f, 0.0f, 1.0f});
 			float[] bFloat = MatrixHelper.multiplyVector(MatrixHelper.rotationY(60 * (i2)), new float[] {1.0f, 0.0f, 0.0f, 1.0f});
 			
-			float[] a = MatrixHelper.minus(new float[] {aFloat[0], aNode.getVertex()[1], aFloat[2]}, thisCentered);
-			float[] b = MatrixHelper.minus(new float[] {bFloat[0], bNode.getVertex()[1], bFloat[2]}, thisCentered);
+			float[] a = MatrixHelper.minus(new float[] {aFloat[0], aNode[1], aFloat[2]}, thisCentered);
+			float[] b = MatrixHelper.minus(new float[] {bFloat[0], bNode[1], bFloat[2]}, thisCentered);
+
+/*			
+			float[] a = MatrixHelper.minus(aNode, this.vertex);
+			float[] b = MatrixHelper.minus(bNode, this.vertex);
+ */
+			
 			a = MatrixHelper.normalize(a);
 			b = MatrixHelper.normalize(b);
 			
-			faceNormals[i] = MatrixHelper.cross(b, a);
+			faceNormals[i] = MatrixHelper.normalize(MatrixHelper.cross(b, a));
 		}
 		return faceNormals;
 	}
@@ -105,46 +96,8 @@ public class ViewNode implements ModelNodeListener {
 		return result;
 	}
 	
-	public float[] getTrainglesVertexData() {
-		float[] vertexData = new float[6 * 3];
-		int[] indexes = new int[] {-1, 2, 1, -1, 1, 0};
-		
-		for(int i = 0; i < 6; i++) {
-			float[] vertex;
-			if (indexes[i] < 0) {
-				vertex = this.getVertex();
-			} else {
-				vertex = surroundingNodes[indexes[i]].getVertex();
-			}
-
-
-			vertexData[i * 3 + 0] = vertex[0];
-			vertexData[i * 3 + 1] = vertex[1];
-			vertexData[i * 3 + 2] = vertex[2];
-		}
-		
-		return vertexData;
-	}
 	
-	public float[] getTrainglesNormalData() {
-		float[] normalData = new float[6 * 3];
-		int[] indexes = new int[] {1, 1, 1, 0, 0, 0};
-
-		float[][] faceNormals = getFaceNormals();
-		
-		for(int i = 0; i < 6; i++) {
-			float[] vertex;
-			if (indexes[i] < 0) {
-				vertex = this.getNormal();
-			} else {
-				vertex = faceNormals[indexes[i]];
-			}
-			
-			normalData[i * 3 + 0] = vertex[0];
-			normalData[i * 3 + 1] = vertex[1];
-			normalData[i * 3 + 2] = vertex[2];
-		}		
-		
-		return normalData;
+	public float[][] getNormalsData(ShadingType shadingType) {
+		return normals.get(shadingType);
 	}
 }
